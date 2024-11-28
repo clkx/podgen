@@ -1,0 +1,30 @@
+from dotenv import load_dotenv
+from langchain_openai import ChatOpenAI
+# from langchain_groq import ChatGroq
+# from langchain_google_genai import ChatGoogleGenerativeAI
+# from langchain_fireworks import ChatFireworks
+# from langchain_ollama import ChatOllama
+
+# Load environment variables from .env file
+load_dotenv()
+
+# Initialize LLM
+llm = ChatOpenAI(model="gpt-4o-mini-2024-07-18",
+                        temperature=1)
+
+
+# llm = ChatGroq(model="llama-3.1-70b-versatile",
+#                     temperature=0)
+
+# llm = ChatGoogleGenerativeAI(
+#     model="gemini-1.5-flash-exp-0827",
+#     temperature=0,
+#     )
+
+
+# FIREWORKS_LLM = ChatFireworks(model="accounts/fireworks/models/llama-v3-70b-instruct")
+
+# OLLAMA_LLM = ChatOllama(model="llama3.1",
+#                         temperature=0,
+#                         # format="json"
+#                         )
