@@ -6,7 +6,7 @@ from langchain_community.document_loaders import WikipediaLoader
 
 from backend.states import InterviewState
 from backend.schema import SearchQuery
-from backend.models.llm import llm
+from backend.models.llm import LLM
 
 # Search query writing
 search_instructions = SystemMessage(content=f"""You will be given a conversation between an analyst and an expert. 
@@ -25,7 +25,7 @@ def search_arxiv_node(state: InterviewState):
     """ Retrieve docs from arxiv """
 
     # Search query
-    structured_llm = llm.with_structured_output(SearchQuery)
+    structured_llm = LLM.with_structured_output(SearchQuery)
     search_query = structured_llm.invoke([search_instructions]+state['messages'])
     
     try:
@@ -74,7 +74,7 @@ def search_web_node(state: InterviewState):
     """ Retrieve docs from web search """
 
     # Search query
-    structured_llm = llm.with_structured_output(SearchQuery)
+    structured_llm = LLM.with_structured_output(SearchQuery)
     search_query = structured_llm.invoke([search_instructions]+state['messages'])
     
     # Search
@@ -106,7 +106,7 @@ def search_wikipedia_node(state: InterviewState):
     """ Retrieve docs from wikipedia """
 
     # Search query
-    structured_llm = llm.with_structured_output(SearchQuery)
+    structured_llm = LLM.with_structured_output(SearchQuery)
     search_query = structured_llm.invoke([search_instructions]+state['messages'])
     
     # Search
@@ -122,3 +122,17 @@ def search_wikipedia_node(state: InterviewState):
     )
 
     return {"context": [formatted_search_docs]}
+
+
+def search_db_node(state: InterviewState):
+    """ Retrieve docs from vector database """
+
+    # Search query
+    structured_llm = LLM.with_structured_output(SearchQuery)
+    search_query = structured_llm.invoke([search_instructions]+state['messages'])
+
+    # Search
+    search_docs = vectordb.search(search_query.search_query, k=10)
+
+    return {"context": [search_docs]}
+

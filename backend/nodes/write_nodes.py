@@ -1,5 +1,5 @@
 from langchain_core.messages import HumanMessage
-from backend.models.llm import llm
+from backend.models.llm import LLM
 from backend.states import ResearchGraphState,  InterviewState
 from langchain_core.messages import SystemMessage
 
@@ -64,7 +64,7 @@ def write_section_node(state: InterviewState):
    
     # Write section using either the gathered source docs from interview (context) or the interview itself (interview)
     system_message = section_writer_instructions.format(focus=analyst.description)
-    section = llm.invoke([SystemMessage(content=system_message)]+[HumanMessage(content=f"Use this source to write your section: {context}")]) 
+    section = LLM.invoke([SystemMessage(content=system_message)]+[HumanMessage(content=f"Use this source to write your section: {context}")]) 
                 
     # Append it to state
     return {"sections": [section.content]}
@@ -94,7 +94,7 @@ def write_introduction_node(state: ResearchGraphState):
     # Summarize the sections into a final report
     
     instructions = intro_conclusion_instructions.format(topic=topic, formatted_str_sections=formatted_str_sections)    
-    intro = llm.invoke([instructions]+[HumanMessage(content=f"Write the report introduction")]) 
+    intro = LLM.invoke([instructions]+[HumanMessage(content=f"Write the report introduction")]) 
     return {"introduction": intro.content}
 
 
@@ -122,7 +122,7 @@ def write_conclusion_node(state: ResearchGraphState):
     # Summarize the sections into a final report
     
     instructions = intro_conclusion_instructions.format(topic=topic, formatted_str_sections=formatted_str_sections)    
-    conclusion = llm.invoke([instructions]+[HumanMessage(content=f"Write the report conclusion")]) 
+    conclusion = LLM.invoke([instructions]+[HumanMessage(content=f"Write the report conclusion")]) 
     return {"conclusion": conclusion.content}
 
 
@@ -171,7 +171,7 @@ def write_report_node(state: ResearchGraphState):
     
     # Summarize the sections into a final report
     system_message = report_writer_instructions.format(topic=topic, context=formatted_str_sections)    
-    report = llm.invoke([SystemMessage(content=system_message)]+[HumanMessage(content=f"Write a report based upon these memos.")]) 
+    report = LLM.invoke([SystemMessage(content=system_message)]+[HumanMessage(content=f"Write a report based upon these memos.")]) 
     return {"content": report.content}
 
 
@@ -199,7 +199,7 @@ def write_introduction_node(state: ResearchGraphState):
     # Summarize the sections into a final report
     
     instructions = intro_conclusion_instructions.format(topic=topic, formatted_str_sections=formatted_str_sections)    
-    intro = llm.invoke([instructions]+[HumanMessage(content=f"Write the report introduction")]) 
+    intro = LLM.invoke([instructions]+[HumanMessage(content=f"Write the report introduction")]) 
     return {"introduction": intro.content}
 
 

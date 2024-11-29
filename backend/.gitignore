@@ -20,3 +20,7 @@ database/chromadb/
 __pycache__/
 *.py[cod]
 *.so
+
+# Test
+test.py
+test.txt

@@ -1,7 +1,7 @@
 from pydantic import BaseModel, Field
 from langchain_core.prompts import ChatPromptTemplate
 
-from backend.models.llm import llm
+from backend.models.llm import LLM
 
 
 plan_template = """你是一位優秀的Podcast腳本家，總是能夠針對客戶的要求撰寫出輕鬆有趣且引人入勝的Podcast腳本，
@@ -43,7 +43,7 @@ class PodcastPlan(BaseModel):
     title: str = Field(description="Podcast標題名稱")
     plan: list[PodcastSubPlan] = Field(description="Podcast大綱段落列表")
 
-structured_llm = llm.with_structured_output(PodcastPlan)
+structured_llm = LLM.with_structured_output(PodcastPlan)
 
 #物件轉成dict
 def object_to_dict(obj):

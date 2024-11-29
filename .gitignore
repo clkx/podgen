@@ -1,2 +1,4 @@
+.env
 frontend_deprecated/
 frontend_deprecated/*
+draw.ipynb

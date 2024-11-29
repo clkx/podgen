@@ -9,14 +9,14 @@ from langchain_openai import ChatOpenAI
 load_dotenv()
 
 # Initialize LLM
-llm = ChatOpenAI(model="gpt-4o-mini-2024-07-18",
+LLM = ChatOpenAI(model="gpt-4o-mini-2024-07-18",
                         temperature=1)
 
 
-# llm = ChatGroq(model="llama-3.1-70b-versatile",
+# LLM = ChatGroq(model="llama-3.1-70b-versatile",
 #                     temperature=0)
 
-# llm = ChatGoogleGenerativeAI(
+# LLM = ChatGoogleGenerativeAI(
 #     model="gemini-1.5-flash-exp-0827",
 #     temperature=0,
 #     )

@@ -1,6 +1,6 @@
 from langchain_core.messages import SystemMessage, AIMessage, HumanMessage, get_buffer_string
 
-from backend.models.llm import llm
+from backend.models.llm import LLM
 from backend.states import GenerateAnalystsState, InterviewState
 from backend.schema import Perspectives
 
@@ -21,7 +21,7 @@ def create_analysts_node(state: GenerateAnalystsState):
 
     system_message = analyst_prompt_template.format(topic=topic, max_analysts=max_analysts)
 
-    structured_llm = llm.with_structured_output(Perspectives)
+    structured_llm = LLM.with_structured_output(Perspectives)
 
     result = structured_llm.invoke([SystemMessage(content=system_message)]+[HumanMessage(content="Generate the set of analysts.")])
 
@@ -56,7 +56,7 @@ def generate_answer_node(state: InterviewState):
 
     # Answer question
     system_message = answer_instructions.format(goals=analyst.persona, context=context)
-    answer = llm.invoke([SystemMessage(content=system_message)]+messages)
+    answer = LLM.invoke([SystemMessage(content=system_message)]+messages)
             
     # Name the message as coming from the expert
     answer.name = "expert"
@@ -86,7 +86,7 @@ def generate_question_node(state: InterviewState):
 
     # Generate question 
     system_message = question_instructions.format(goals=analyst.persona)
-    question = llm.invoke([SystemMessage(content=system_message)]+messages)
+    question = LLM.invoke([SystemMessage(content=system_message)]+messages)
         
     # Write messages to state
     return {"messages": [question]}

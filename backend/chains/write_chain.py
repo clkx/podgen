@@ -1,7 +1,7 @@
 from langchain_core.prompts import ChatPromptTemplate
 from pydantic import BaseModel, Field
 
-from backend.models.llm import llm
+from backend.models.llm import LLM
 
 
 write_template = """你是一位優秀的Podcast腳本家，總是能夠針對客戶的要求撰寫出輕鬆有趣且引人入勝的Podcast腳本，
@@ -66,7 +66,7 @@ class DialogueScript(BaseModel):
 def object_to_dict(obj):
     return obj.model_dump()
 
-structured_llm = llm.with_structured_output(DialogueScript)
+structured_llm = LLM.with_structured_output(DialogueScript)
 # Create the write chain
 write_chain = write_prompt | structured_llm | object_to_dict
 

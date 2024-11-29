@@ -1,7 +1,7 @@
 from langchain_core.output_parsers import StrOutputParser
 from langchain_core.prompts import ChatPromptTemplate
 
-from backend.models.llm import llm
+from backend.models.llm import LLM
 
 
 summ_pass3_template = """You have already performed a first and second pass on this paper with the following summaries:
@@ -33,7 +33,7 @@ summ_pass3_prompt = ChatPromptTemplate([
     ('user', summ_pass3_template)
 ])
 
-summ_pass3_chain = summ_pass3_prompt | llm | StrOutputParser()
+summ_pass3_chain = summ_pass3_prompt | LLM | StrOutputParser()
 
 ## For testing
 if __name__ == "__main__":

@@ -7,6 +7,9 @@ from backend.graphs.summarizing_graph import create_summarizing_graph
 from backend.graphs.scriptwriting_graph import create_scriptwriting_graph
 
 
+import nest_asyncio
+nest_asyncio.apply()
+
 class PdfInputState(TypedDict):
     pdf_path : str
     host_name : str
@@ -65,3 +68,16 @@ if __name__ == "__main__":
          "guest_background": "阿笠博士是一位資深的領域學者，擁有豐富的研究經驗，擅長以輕鬆有趣的方式解釋複雜的議題，並將其轉化為聽眾容易理解的內容。"}
     )
     print(result)
+    # display(Image(pdf_graph.get_graph().draw_png()))
+
+    # Image(
+    #     pdf_graph.get_graph().draw_mermaid_png(
+    #         curve_style=CurveStyle.LINEAR,
+    #         node_colors=NodeStyles(first="#ffdfba", last="#baffc9", default="#fad7de"),
+    #         wrap_label_n_words=9,
+    #         output_file_path=None,
+    #         draw_method=MermaidDrawMethod.PYPPETEER,
+    #         background_color="white",
+    #         padding=10,
+    #     )
+    # )

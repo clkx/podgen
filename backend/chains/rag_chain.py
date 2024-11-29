@@ -22,7 +22,7 @@ import sys
 import os
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from models.llm import llm
+from models.llm import LLM
 
 
 
@@ -71,7 +71,7 @@ tool_prompt = ChatPromptTemplate([
 
 tools = [add, multiply]
 
-llm_with_tools = llm.bind_tools(tools)
+llm_with_tools = LLM.bind_tools(tools)
 
 tool_chain = tool_prompt | llm_with_tools
 

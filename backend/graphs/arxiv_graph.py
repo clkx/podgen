@@ -6,7 +6,6 @@ from backend.nodes.arxiv_reading_node import arxiv_reading_node
 from backend.graphs.summarizing_graph import create_summarizing_graph
 from backend.graphs.scriptwriting_graph import create_scriptwriting_graph
 
-
 class ArxivInputState(TypedDict):
     arxiv_url : str
     host_name : str
