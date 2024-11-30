@@ -1,30 +1,30 @@
-from fastapi import FastAPI, UploadFile, File, HTTPException, Body, Request, Form
+from fastapi import FastAPI, UploadFile, File, HTTPException, Form
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 from typing import List, Optional, Dict
 import json
-import sys
 import os
 import pdfplumber
 import io
 import shutil
+import unicodedata
+import re
 from pathlib import Path
 from fastapi.responses import FileResponse, StreamingResponse, HTMLResponse
 from dotenv import load_dotenv
-from fastapi.staticfiles import StaticFiles
+from datetime import datetime
 
-from backend.models.llm import llm
 from backend.graphs.pdf_graph import create_pdf_graph
 from backend.graphs.arxiv_graph import create_arxiv_graph
 from backend.graphs.research_graph import create_research_graph
 from backend.graphs.scriptwriting_graph import create_scriptwriting_graph
 from backend.graphs.summarizing_graph import create_summarizing_graph
 from backend.graphs.prompt_graph import create_prompt_graph
-from datetime import datetime
-import unicodedata
-import re
 from backend.schema import *
-from speech_synthesis import synthesize_podcast, PodcastSynthesizer
+from backend.speech_synthesis import synthesize_podcast, PodcastSynthesizer
+from backend.database.qdrant_manager import QdrantManager
+from backend.models.embedding import EMBEDDING_MODEL
 
 load_dotenv()
 
@@ -182,7 +182,7 @@ async def upload_pdf(
             if file_size > MAX_FILE_SIZE:
                 raise HTTPException(
                     status_code=413,
-                    detail="檔小超過限制（最大 10MB）"
+                    detail="檔案大小超過限制（最大 10MB）"
                 )
             content.extend(chunk)
         
@@ -246,28 +246,19 @@ async def upload_pdf(
                 summary_dict = summary_output if isinstance(summary_output, dict) else json.loads(summary_output)
                 
                 # 組合 Markdown 格式的總結
-                summary_md = f"""---
-                generated_at: {datetime.now().strftime("%Y-%m-%d %H:%M:%S")}
-                source_file: {pdf_file.filename}
-                ---
-
-                # 第一階段分析：快速瀏覽
-                {summary_dict.get('first_pass_summary', '無內容')}
-
-                # 第二階段分析：深入理解
-                {summary_dict.get('second_pass_summary', '無內容')}
-
-                # 第三階段分析：深度分析
-                {summary_dict.get('third_pass_summary', '無內容')}
-                """
+                summary_md = summary_dict.get('content', '無內容')
                 
                 # 儲存摘要到 summary.md - 使用{時間}_summary格式
                 summary_path = folder_path / f"{timestamp}_summary.md"
                 with summary_path.open("w", encoding="utf-8") as f:
                     f.write(summary_md)
                 
+                # 將摘要存入向量資料庫
+                qdrant_manager = QdrantManager(EMBEDDING_MODEL)
+                qdrant_manager.split_and_add_summary(summary_md, folder_name=timestamp)
+
             except Exception as e:
-                print(f"生成總結時發生錯誤：{str(e)}")
+                print(f"生成摘要時發生錯誤：{str(e)}")
                 # 繼續執行，不中斷上傳流程
             
             print(f"參考資料已儲存至：{folder_path}")
@@ -295,7 +286,7 @@ async def upload_pdf(
 
 @app.delete("/api/reference/{folder_name}")
 async def delete_reference(folder_name: str):
-    """除參考資料資料夾(包含原始上傳的PDF檔案、Markdown、摘要)"""
+    """移除參考資料資料夾(包含原始上傳的PDF檔案、Markdown、摘要)"""
     try:
         folder_path = REFERENCES_PATH / folder_name
         
@@ -308,6 +299,10 @@ async def delete_reference(folder_name: str):
         
         # 刪除資料夾及其內容
         shutil.rmtree(folder_path)
+        
+        # 刪除向量資料庫中的摘要
+        qdrant_manager = QdrantManager(EMBEDDING_MODEL)
+        qdrant_manager.delete_summary(folder_name)
         
         return {
             "status": "success",
@@ -483,6 +478,7 @@ async def delete_temp(folder_name: str):
         )
 
 
+
 @app.get("/api/reference/{folder_name}/pdf")
 async def get_pdf(folder_name: str):
     """提供 PDF 檔案的存取"""
@@ -520,6 +516,7 @@ async def get_pdf(folder_name: str):
             status_code=500, 
             detail=f"PDF 檔案存取失敗：{str(e)}"
         )
+
 
 
 @app.post("/api/synthesize", response_model=AudioScript)
@@ -573,6 +570,8 @@ async def synthesize_script(script: PodcastScript, voice_settings: Optional[Voic
             status_code=500,
             detail=f"語音合成失敗：{str(e)}"
         )
+
+
 
 @app.get("/api/voices")
 async def get_available_voices():

@@ -98,7 +98,7 @@ def route_messages_node(state: InterviewState, name: str = "expert"):
     
     # Get messages
     messages = state["messages"]
-    max_num_turns = state.get('max_num_turns',2)
+    max_num_turns = state.get('max_num_turns',3)
 
     # Check the number of expert answers 
     num_responses = len(
@@ -107,15 +107,15 @@ def route_messages_node(state: InterviewState, name: str = "expert"):
 
     # End if expert has answered more than the max turns
     if num_responses >= max_num_turns:
-        return 'save_interview'
+        return 'save_interview_node'
 
     # This router is run after each question - answer pair 
     # Get the last question asked to check if it signals the end of discussion
     last_question = messages[-2]
     
     if "Thank you so much for your help" in last_question.content:
-        return 'save_interview'
-    return "ask_question"
+        return 'save_interview_node'
+    return "generate_question_node"
 
 
 

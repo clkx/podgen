@@ -79,7 +79,7 @@ class PodcastSynthesizer:
             print(f"- 輸出檔案: {output_file}")
 
             synthesizer = speechsdk.SpeechSynthesizer(
-                speech_config=self.speech_config, 
+                speech_config=self.speech_config,
                 audio_config=None
             )
 

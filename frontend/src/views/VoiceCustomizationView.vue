@@ -1,6 +1,6 @@
 <template>
-  <div class="flex-1 p-6">
-    <div class="bg-white rounded-lg shadow-md p-6">
+  <div class="flex-1 p-4 md:p-6">
+    <div class="bg-white rounded-lg shadow-md p-4 md:p-6">
       <h2 class="text-2xl font-semibold mb-4">語音客製化</h2>
       <p class="text-gray-600 mb-6">在此設定主持人和來賓的語音特徵</p>
 
@@ -10,7 +10,7 @@
           <i class="fas fa-microphone text-blue-500 mr-2"></i>
           <h3 class="text-lg font-medium text-gray-700">主持人語音</h3>
         </div>
-        <div class="space-y-4">
+        <div class="space-y-4 md:space-y-6">
           <div>
             <label class="block text-sm font-medium text-gray-600 mb-2">語速調整</label>
             <div class="flex items-center space-x-4">
@@ -48,7 +48,7 @@
           <i class="fas fa-user text-green-500 mr-2"></i>
           <h3 class="text-lg font-medium text-gray-700">來賓語音</h3>
         </div>
-        <div class="space-y-4">
+        <div class="space-y-4 md:space-y-6">
           <div>
             <label class="block text-sm font-medium text-gray-600 mb-2">語速調整</label>
             <div class="flex items-center space-x-4">

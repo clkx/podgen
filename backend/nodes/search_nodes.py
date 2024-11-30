@@ -3,10 +3,14 @@ import arxiv
 from langchain_core.messages import SystemMessage
 from langchain_community.tools.tavily_search import TavilySearchResults
 from langchain_community.document_loaders import WikipediaLoader
+from langchain.retrievers.document_compressors import FlashrankRerank
+from langchain.retrievers import ContextualCompressionRetriever
 
 from backend.states import InterviewState
 from backend.schema import SearchQuery
 from backend.models.llm import LLM
+from backend.database.qdrant_manager import QdrantManager
+from backend.models.embedding import EMBEDDING_MODEL
 
 # Search query writing
 search_instructions = SystemMessage(content=f"""You will be given a conversation between an analyst and an expert. 
@@ -131,8 +135,35 @@ def search_db_node(state: InterviewState):
     structured_llm = LLM.with_structured_output(SearchQuery)
     search_query = structured_llm.invoke([search_instructions]+state['messages'])
 
-    # Search
-    search_docs = vectordb.search(search_query.search_query, k=10)
+    # Running search
+    qdrant_manager = QdrantManager(EMBEDDING_MODEL)
+    vectordb = qdrant_manager.get_vectordb()
+    # search_docs = vectordb.similarity_search(search_query.search_query, k=10)
 
-    return {"context": [search_docs]}
+    # Create retriever
+    retriever = vectordb.as_retriever(
+        search_type="similarity",
+        search_kwargs={"k": 100}
+    )
+
+
+    RERANK_MODEL = 'ms-marco-MultiBERT-L-12'
+
+    compressor = FlashrankRerank(model=RERANK_MODEL, top_n=5)  # K2, Top5 Answers
+    compression_retriever = ContextualCompressionRetriever(
+        base_compressor=compressor, 
+        base_retriever=retriever
+    )
+
+    search_docs = compression_retriever.invoke(search_query.search_query)
+
+    # Format
+    formatted_search_docs = "\n\n---\n\n".join(
+        [
+            f'<Document source="user provided knowledge database"/>\n{doc.page_content}\n</Document>'
+            for doc in search_docs
+        ]
+    )
+    
+    return {"context": [formatted_search_docs]}
 

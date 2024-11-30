@@ -1,9 +1,7 @@
 from langgraph.graph import StateGraph, START, END
 from typing_extensions import TypedDict
 
-from backend.nodes.summ_pass1_node import summ_pass1_node
-from backend.nodes.summ_pass2_node import summ_pass2_node
-from backend.nodes.summ_pass3_node import summ_pass3_node
+from backend.nodes.summarize_nodes import summ_pass1_node, summ_pass2_node, summ_pass3_node
 
 
 class SummarizingInputState(TypedDict):

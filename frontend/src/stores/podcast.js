@@ -3,9 +3,14 @@ import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import axios from 'axios'
 import { useCharacterStore } from './character'
+import { useGenerationStore } from './generation'
 import { Howl } from 'howler'
 
 export const usePodcastStore = defineStore('podcast', () => {
+  // 取得其他 store
+  const characterStore = useCharacterStore()
+  const generationStore = useGenerationStore()
+
   // 狀態
   const script = ref(null)
   const audioQueue = ref([])
@@ -80,7 +85,6 @@ export const usePodcastStore = defineStore('podcast', () => {
 
   const generateScript = async (arxivUrl) => {
     try {
-      const characterStore = useCharacterStore()
       console.log('開始生成腳本，參數:', {
         arxivUrl,
         host: characterStore.host,
@@ -158,53 +162,62 @@ export const usePodcastStore = defineStore('podcast', () => {
 
   const generateAudio = async (scriptData) => {
     try {
-      const characterStore = useCharacterStore()
+      console.log('開始生成語音，資料:', scriptData)
       
+      // 確保 dialogue 格式正確
+      const formattedDialogue = scriptData.dialogue.map(line => ({
+        speaker: line.speaker,
+        content: line.content,
+        speaker_type: line.speaker === scriptData.host_name ? 'host' : 'guest'
+      }))
+
       const response = await fetch('http://localhost:8000/api/synthesize/stream', {
         method: 'POST',
-        headers: { 
+        headers: {
           'Content-Type': 'application/json',
-          'Accept': 'application/x-ndjson'
         },
-        credentials: 'include',
         body: JSON.stringify({
-          script: {
-            ...scriptData,
-            host_name: characterStore.host.name,
-            host_background: characterStore.host.background,
-            guest_name: characterStore.guest.name,
-            guest_background: characterStore.guest.background
-          },
-          voice_settings: {
-            host_voice: characterStore.host.voice || "zh-TW-HsiaoChenNeural",
-            guest_voice: characterStore.guest.voice || "zh-TW-YunJheNeural"
-          }
+          dialogue: formattedDialogue,
+          host_name: characterStore.host.name,
+          guest_name: characterStore.guest.name,
+          host_voice: characterStore.host.voice || "zh-TW-HsiaoChenNeural",
+          guest_voice: characterStore.guest.voice || "zh-TW-YunJheNeural"
         })
       })
 
       if (!response.ok) {
-        throw new Error(`語音生成請求失敗: ${response.status}`)
+        const errorData = await response.json()
+        console.error('語音生成請求失敗:', errorData)
+        throw new Error(errorData.detail || '語音生成失敗')
       }
 
       const reader = response.body.getReader()
       const decoder = new TextDecoder()
+      let buffer = ''
 
-      try {
-        while (true) {
-          const { value, done } = await reader.read()
-          if (done) break
-          
-          const segments = decoder.decode(value).trim().split('\n')
-          for (const segment of segments) {
-            if (!segment) continue
-            await handleAudioSegment(JSON.parse(segment))
+      while (true) {
+        const { value, done } = await reader.read()
+        if (done) break
+
+        buffer += decoder.decode(value, { stream: true })
+        
+        // 處理完整的 JSON 物件
+        while (buffer.includes('\n')) {
+          const newlineIndex = buffer.indexOf('\n')
+          const jsonString = buffer.slice(0, newlineIndex)
+          buffer = buffer.slice(newlineIndex + 1)
+
+          try {
+            const segment = JSON.parse(jsonString)
+            await handleAudioSegment(segment)
+          } catch (err) {
+            console.error('解析音頻段落失敗:', err)
           }
         }
-      } finally {
-        reader.releaseLock()
       }
-    } catch (err) {
-      throw new Error('語音生成失敗：' + err.message)
+    } catch (error) {
+      console.error('語音生成失敗:', error)
+      throw error
     }
   }
 
@@ -212,11 +225,8 @@ export const usePodcastStore = defineStore('podcast', () => {
     switch (segment.type) {
       case 'progress':
         console.log('進度更新:', segment)
-        currentProgress.value = {
-          stage: 'audio',
-          percentage: (segment.index / segment.total) * 100,
-          message: `正在生成第 ${segment.index + 1}/${segment.total} 段語音`
-        }
+        // 更新生成進度
+        generationStore.updateAudioProgress(segment.index, segment.total)
         break
         
       case 'audio':
@@ -227,6 +237,8 @@ export const usePodcastStore = defineStore('podcast', () => {
           content: segment.content,
           audioFile: segment.audio_file
         })
+        // 更新生成進度
+        generationStore.updateAudioProgress(segment.index + 1, segment.total)
         console.log('當前佇列:', audioQueue.value)
         break
         
@@ -351,19 +363,11 @@ export const usePodcastStore = defineStore('podcast', () => {
   // 添加新的 action
   const generateFromPrompt = async (topic) => {
     try {
-      // 開始生成時顯示進度
+      // 開始生成腳本
       showProgress.value = true
       fadeOutProgress.value = false
-      
       error.value = null
       generationStatus.value = 'generating-script'
-      currentProgress.value = {
-        stage: 'script',
-        percentage: 0,
-        message: '正在生成對話腳本'
-      }
-
-      const characterStore = useCharacterStore()
       
       // 檢查必要的角色資訊
       if (!characterStore.host.name || !characterStore.host.character ||
@@ -381,8 +385,6 @@ export const usePodcastStore = defineStore('podcast', () => {
         guest_background: characterStore.guest.character
       }
 
-      console.log('發送請求資料:', requestData)  // 添加日誌
-
       // 調用後端 API 生成腳本
       const response = await fetch('http://localhost:8000/api/generate/script/prompt', {
         method: 'POST',
@@ -393,17 +395,9 @@ export const usePodcastStore = defineStore('podcast', () => {
       })
 
       const responseData = await response.json()
-      console.log('API 回應內容:', JSON.stringify(responseData, null, 2))
-
+      
       if (!response.ok) {
         if (responseData.detail) {
-          if (Array.isArray(responseData.detail)) {
-            const errors = responseData.detail.map(err => {
-              console.log('驗證錯誤:', err)  // 添加日誌
-              return err.msg
-            })
-            throw new Error(errors.join('\n'))
-          }
           throw new Error(typeof responseData.detail === 'string' 
             ? responseData.detail 
             : JSON.stringify(responseData.detail))
@@ -414,18 +408,14 @@ export const usePodcastStore = defineStore('podcast', () => {
       // 更新腳本狀態
       script.value = responseData
 
-      // 生成語音
-      currentProgress.value = {
-        stage: 'audio',
-        percentage: 0,
-        message: '正在生成語音...'
-      }
+      // 開始生成語音
       generationStatus.value = 'generating-audio'
       
       // 清空之前的音頻佇列
       audioQueue.value = []
       currentAudioIndex.value = 0
       
+      // 生成語音
       await generateAudio(responseData)
       
       // 生成完成後，延遲一下再淡出進度區域
@@ -435,16 +425,12 @@ export const usePodcastStore = defineStore('podcast', () => {
       }, 1000)
 
       generationStatus.value = 'completed'
-    } catch (err) {
-      console.error('Prompt 生成失敗:', {
-        error: err,
-        message: err.message,
-        stack: err.stack,
-        detail: err.detail
-      })
-      error.value = err.message || 'Prompt 生成失敗'
+      
+      return responseData
+    } catch (error) {
+      console.error('Prompt 生成失敗:', error)
       generationStatus.value = 'error'
-      throw err
+      throw error
     }
   }
 
@@ -462,8 +448,6 @@ export const usePodcastStore = defineStore('podcast', () => {
         message: '正在生成對話腳本'
       }
 
-      const characterStore = useCharacterStore()
-      
       // 建立 FormData，確保所有必要欄位都有值
       const formData = new FormData()
       formData.append('pdf_file', pdfFile)  // 檔案必須是 File 物件
@@ -490,7 +474,7 @@ export const usePodcastStore = defineStore('podcast', () => {
                 case 'host_name':
                   return '請設定主持人名稱'
                 case 'host_background':
-                  return '請設定主持人背景'
+                  return '設定主持人背景'
                 case 'guest_name':
                   return '請設定來賓名稱'
                 case 'guest_background':

@@ -1,4 +1,5 @@
 import { createRouter, createWebHistory } from 'vue-router'
+import HomeView from '../views/HomeView.vue'
 import PodcastGeneratorView from '../views/PodcastGeneratorView.vue'
 import BackgroundSettingView from '../views/BackgroundSettingView.vue'
 import VoiceCustomizationView from '../views/VoiceCustomizationView.vue'
@@ -8,6 +9,11 @@ const router = createRouter({
   routes: [
     {
       path: '/',
+      name: 'home',
+      component: HomeView
+    },
+    {
+      path: '/podcast-generator',
       name: 'podcast-generator',
       component: PodcastGeneratorView
     },
