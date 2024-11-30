@@ -1,4 +1,4 @@
-from fastapi import FastAPI, UploadFile, File, HTTPException, Form
+from fastapi import FastAPI, UploadFile, File, HTTPException, Form, BackgroundTasks
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
@@ -14,6 +14,7 @@ from pathlib import Path
 from fastapi.responses import FileResponse, StreamingResponse, HTMLResponse
 from dotenv import load_dotenv
 from datetime import datetime
+import azure.cognitiveservices.speech as speechsdk
 
 from backend.graphs.pdf_graph import create_pdf_graph
 from backend.graphs.arxiv_graph import create_arxiv_graph
@@ -110,7 +111,10 @@ class PodcastScript(BaseModel):
     host_background: Optional[str] = None
     guest_background: Optional[str] = None
 
-
+class PreviewRequest(BaseModel):
+    text: str
+    voice: str
+    service: str = "azure"  # 預設使用 Azure
 
 # 確保參考資料目錄存在
 REFERENCES_PATH.mkdir(parents=True, exist_ok=True)
@@ -622,6 +626,62 @@ async def synthesize_script_stream(
         raise HTTPException(
             status_code=500,
             detail=str(e)
+        )
+
+@app.post("/api/synthesize/preview")
+async def preview_voice(request: PreviewRequest):
+    try:
+        if request.service == "azure":
+            # 設定 Azure 語音服務
+            speech_config = speechsdk.SpeechConfig(
+                subscription=os.getenv("AZURE_SPEECH_KEY"),
+                region=os.getenv("AZURE_SPEECH_REGION")
+            )
+            
+            # 設定語音輸出為記憶體串流
+            memory_stream = io.BytesIO()
+            audio_config = speechsdk.audio.AudioOutputConfig(
+                filename=None,
+                stream=memory_stream
+            )
+            
+            # 設定語音合成器
+            speech_config.speech_synthesis_voice_name = request.voice
+            synthesizer = speechsdk.SpeechSynthesizer(
+                speech_config=speech_config,
+                audio_config=audio_config
+            )
+            
+            # 合成語音
+            result = synthesizer.speak_text_async(request.text).get()
+            
+            if result.reason == speechsdk.ResultReason.SynthesizingAudioCompleted:
+                # 重置串流位置
+                memory_stream.seek(0)
+                
+                # 返回音頻串流
+                return StreamingResponse(
+                    memory_stream,
+                    media_type="audio/wav",
+                    headers={
+                        "Content-Disposition": "attachment; filename=preview.wav"
+                    }
+                )
+            else:
+                raise HTTPException(
+                    status_code=500,
+                    detail=f"語音合成失敗: {result.reason}"
+                )
+        else:
+            raise HTTPException(
+                status_code=400,
+                detail=f"不支援的語音服務: {request.service}"
+            )
+            
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"語音預覽失敗: {str(e)}"
         )
 
 if __name__ == "__main__":

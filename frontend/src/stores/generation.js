@@ -133,12 +133,12 @@ export const useGenerationStore = defineStore('generation', () => {
 
   // 更新音頻生成進度
   const updateAudioProgress = (current, total) => {
-    const percentage = Math.round((current / total) * 100)
+    const percentage = Math.min(100, Math.round((current / total) * 100))
     console.log('音頻生成進度:', percentage)
     
     progress.value = {
       percentage,
-      message: `正在生成語音 ${current}/${total} (${percentage}%)`,
+      message: `正在生成語音 ${current}/${total}`,
       stage: 'audio'
     }
   }

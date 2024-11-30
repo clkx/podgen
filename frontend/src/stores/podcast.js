@@ -162,32 +162,70 @@ export const usePodcastStore = defineStore('podcast', () => {
 
   const generateAudio = async (scriptData) => {
     try {
-      console.log('開始生成語音，資料:', scriptData)
+      console.log('開始生成語音，原始資料:', scriptData)
       
+      // 驗證必要的資料
+      if (!scriptData || !scriptData.dialogue || !Array.isArray(scriptData.dialogue)) {
+        throw new Error('無效的腳本資料格式')
+      }
+
       // 確保 dialogue 格式正確
-      const formattedDialogue = scriptData.dialogue.map(line => ({
-        speaker: line.speaker,
-        content: line.content,
-        speaker_type: line.speaker === scriptData.host_name ? 'host' : 'guest'
-      }))
+      const formattedDialogue = scriptData.dialogue.map((line, index) => {
+        if (!line.speaker || !line.content) {
+          throw new Error(`對話行 ${index + 1} 缺少必要資料`)
+        }
+        return {
+          speaker: line.speaker,
+          content: line.content,
+          speaker_type: line.speaker === scriptData.host_name ? 'host' : 'guest'
+        }
+      })
+
+      console.log('格式化後的對話資料:', formattedDialogue)
+
+      // 驗證角色設定
+      if (!characterStore.host.name || !characterStore.guest.name) {
+        throw new Error('請先設定主持人和來賓的名稱')
+      }
+
+      const requestData = {
+        script: {
+          dialogue: formattedDialogue,
+          host_name: characterStore.host.name,
+          guest_name: characterStore.guest.name,
+          host_background: characterStore.host.background,
+          guest_background: characterStore.guest.background
+        },
+        voice_settings: {
+          host_voice: characterStore.host.voice || "zh-TW-HsiaoChenNeural",
+          guest_voice: characterStore.guest.voice || "zh-TW-YunJheNeural"
+        }
+      }
+
+      console.log('發送請求資料:', requestData)
 
       const response = await fetch('http://localhost:8000/api/synthesize/stream', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({
-          dialogue: formattedDialogue,
-          host_name: characterStore.host.name,
-          guest_name: characterStore.guest.name,
-          host_voice: characterStore.host.voice || "zh-TW-HsiaoChenNeural",
-          guest_voice: characterStore.guest.voice || "zh-TW-YunJheNeural"
-        })
+        body: JSON.stringify(requestData)
       })
 
       if (!response.ok) {
         const errorData = await response.json()
         console.error('語音生成請求失敗:', errorData)
+        
+        // 處理驗證錯誤
+        if (errorData.detail && Array.isArray(errorData.detail)) {
+          const errorMessages = errorData.detail.map(err => {
+            // 解析錯誤位置和訊息
+            const location = err.loc.join('.')
+            return `${location}: ${err.msg}`
+          })
+          throw new Error('資料驗證錯誤：\n' + errorMessages.join('\n'))
+        }
+        
         throw new Error(errorData.detail || '語音生成失敗')
       }
 
@@ -212,6 +250,7 @@ export const usePodcastStore = defineStore('podcast', () => {
             await handleAudioSegment(segment)
           } catch (err) {
             console.error('解析音頻段落失敗:', err)
+            throw new Error('音頻段落處理失敗：' + err.message)
           }
         }
       }
@@ -222,29 +261,26 @@ export const usePodcastStore = defineStore('podcast', () => {
   }
 
   const handleAudioSegment = async (segment) => {
-    switch (segment.type) {
-      case 'progress':
-        console.log('進度更新:', segment)
-        // 更新生成進度
-        generationStore.updateAudioProgress(segment.index, segment.total)
-        break
-        
-      case 'audio':
-        console.log('收到音頻段落:', segment)
-        audioQueue.value.push({
-          index: segment.index,
-          speaker: segment.speaker,
-          content: segment.content,
-          audioFile: segment.audio_file
-        })
-        // 更新生成進度
-        generationStore.updateAudioProgress(segment.index + 1, segment.total)
-        console.log('當前佇列:', audioQueue.value)
-        break
-        
-      case 'error':
-        console.error('音頻段落錯誤:', segment)
-        throw new Error(segment.message)
+    console.log('收到音頻段落:', segment)
+    
+    if (segment.type === 'audio' && segment.status === 'success') {
+      // 更新進度
+      generationStore.updateAudioProgress(segment.index + 1, segment.total)
+      
+      // 將音頻段落加入佇列
+      const audioData = {
+        index: segment.index,
+        content: segment.content,
+        audioFile: segment.audio_file,  // 改回使用 audio_file
+        speaker: segment.speaker
+      }
+      
+      // 確保按照順序插入
+      if (!audioQueue.value[segment.index]) {
+        audioQueue.value[segment.index] = audioData
+      }
+      
+      console.log('當前佇列:', audioQueue.value)
     }
   }
 
@@ -259,7 +295,7 @@ export const usePodcastStore = defineStore('podcast', () => {
 
     // 檢查是否已經播放完所有段落
     if (currentAudioIndex.value >= audioQueue.value.length) {
-        console.log('所有段落播放')
+        console.log('所有段落播放完畢')
         isPlaying.value = false
         currentAudioIndex.value = 0  // 重置為第一段
         return
@@ -368,21 +404,15 @@ export const usePodcastStore = defineStore('podcast', () => {
       fadeOutProgress.value = false
       error.value = null
       generationStatus.value = 'generating-script'
-      
-      // 檢查必要的角色資訊
-      if (!characterStore.host.name || !characterStore.host.character ||
-          !characterStore.guest.name || !characterStore.guest.character) {
-        throw new Error('請先設定主持人和來賓的資訊')
-      }
 
       // 準備請求資料
       const requestData = {
         topic: topic,
         max_analysts: 3,
         host_name: characterStore.host.name,
-        host_background: characterStore.host.character,
+        host_background: characterStore.host.background,
         guest_name: characterStore.guest.name,
-        guest_background: characterStore.guest.character
+        guest_background: characterStore.guest.background
       }
 
       // 調用後端 API 生成腳本
@@ -452,9 +482,9 @@ export const usePodcastStore = defineStore('podcast', () => {
       const formData = new FormData()
       formData.append('pdf_file', pdfFile)  // 檔案必須是 File 物件
       formData.append('host_name', characterStore.host.name || '')
-      formData.append('host_background', characterStore.host.character || '')
+      formData.append('host_background', characterStore.host.background || '')
       formData.append('guest_name', characterStore.guest.name || '')
-      formData.append('guest_background', characterStore.guest.character || '')
+      formData.append('guest_background', characterStore.guest.background || '')
 
       // 調用後端 API 生成腳本
       const response = await fetch('http://localhost:8000/api/generate/script/pdf', {

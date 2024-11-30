@@ -26,6 +26,11 @@ const router = createRouter({
       path: '/voice-customization',
       name: 'voice-customization',
       component: VoiceCustomizationView
+    },
+    {
+      path: '/settings/voice',
+      name: 'voiceSettings',
+      component: () => import('../components/VoiceSettings.vue')
     }
   ]
 })

@@ -18,7 +18,7 @@
             <router-link to="/background-setting" class="nav-link">
               <i class="fas fa-user-circle mr-2"></i>背景設定
             </router-link>
-            <router-link to="/voice-customization" class="nav-link">
+            <router-link to="/settings/voice" class="nav-link">
               <i class="fas fa-microphone-alt mr-2"></i>語音設定
             </router-link>
           </div>
@@ -63,7 +63,7 @@
         <router-link to="/" class="w-12 h-12 bg-white rounded-full flex items-center justify-center text-[#1e2235] text-2xl shadow-lg">
           🎛
         </router-link>
-        
+
         <router-link to="/podcast-generator" class="nav-icon">
           <i class="fas fa-podcast"></i>
         </router-link>
@@ -72,13 +72,9 @@
           <i class="fas fa-user-circle"></i>
         </router-link>
         
-        <router-link to="/voice-customization" class="nav-icon">
+        <router-link to="/settings/voice" class="nav-icon">
           <i class="fas fa-microphone-alt"></i>
         </router-link>
-        
-        <button class="nav-icon">
-          <i class="fas fa-cog"></i>
-        </button>
       </nav>
 
       <!-- 主內容區域 -->
@@ -133,7 +129,7 @@ const navItems = [
     icon: 'fas fa-user-circle'
   },
   { 
-    path: '/voice-customization', 
+    path: '/settings/voice', 
     name: '語音設定',
     icon: 'fas fa-microphone-alt'
   }
