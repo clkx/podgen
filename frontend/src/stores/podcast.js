@@ -162,7 +162,8 @@ export const usePodcastStore = defineStore('podcast', () => {
 
   const generateAudio = async (scriptData) => {
     try {
-      console.log('開始生成語音，原始資料:', scriptData)
+      console.log('=== 開始生成語音 ===')
+      console.log('原始腳本資料:', scriptData)
       
       // 驗證必要的資料
       if (!scriptData || !scriptData.dialogue || !Array.isArray(scriptData.dialogue)) {
@@ -174,6 +175,16 @@ export const usePodcastStore = defineStore('podcast', () => {
         if (!line.speaker || !line.content) {
           throw new Error(`對話行 ${index + 1} 缺少必要資料`)
         }
+        
+        // 第一個說話者永遠是主持人
+        if (index === 0) {
+          return {
+            speaker: characterStore.host.name,  // 強制使用主持人名稱
+            content: line.content,
+            speaker_type: 'host'
+          }
+        }
+        
         return {
           speaker: line.speaker,
           content: line.content,
@@ -188,6 +199,24 @@ export const usePodcastStore = defineStore('podcast', () => {
         throw new Error('請先設定主持人和來賓的名稱')
       }
 
+      console.log('=== 檢查語音設定 ===')
+      console.log('characterStore 狀態:', {
+        host: characterStore.host,
+        guest: characterStore.guest
+      })
+
+      // 記錄當前的語音設定
+      const voiceSettings = {
+        host_voice: characterStore.host.voice.name || "zh-TW-HsiaoChenNeural",
+        guest_voice: characterStore.guest.voice.name || "zh-TW-YunJheNeural",
+        host_speed: characterStore.host.voice.speed || 1.0,
+        guest_speed: characterStore.guest.voice.speed || 1.0,
+        host_pitch: characterStore.host.voice.pitch || 0,
+        guest_pitch: characterStore.guest.voice.pitch || 0
+      }
+      
+      console.log('最終使用的語音設定:', voiceSettings)
+
       const requestData = {
         script: {
           dialogue: formattedDialogue,
@@ -196,13 +225,11 @@ export const usePodcastStore = defineStore('podcast', () => {
           host_background: characterStore.host.background,
           guest_background: characterStore.guest.background
         },
-        voice_settings: {
-          host_voice: characterStore.host.voice || "zh-TW-HsiaoChenNeural",
-          guest_voice: characterStore.guest.voice || "zh-TW-YunJheNeural"
-        }
+        voice_settings: voiceSettings
       }
 
-      console.log('發送請求資料:', requestData)
+      console.log('=== 發送請求 ===')
+      console.log('完整請求資料:', requestData)
 
       const response = await fetch('http://localhost:8000/api/synthesize/stream', {
         method: 'POST',
@@ -475,7 +502,7 @@ export const usePodcastStore = defineStore('podcast', () => {
       currentProgress.value = {
         stage: 'script',
         percentage: 0,
-        message: '正在生成對話腳本'
+        message: '正在生成對話本'
       }
 
       // 建立 FormData，確保所有必要欄位都有值
@@ -486,7 +513,7 @@ export const usePodcastStore = defineStore('podcast', () => {
       formData.append('guest_name', characterStore.guest.name || '')
       formData.append('guest_background', characterStore.guest.background || '')
 
-      // 調用後端 API 生成腳本
+      // 調用後端 API 生腳本
       const response = await fetch('http://localhost:8000/api/generate/script/pdf', {
         method: 'POST',
         body: formData

@@ -65,7 +65,7 @@ app.mount("/audio", StaticFiles(directory=str(AUDIO_DIR)), name="audio")
 # 請求模型
 class PromptInput(BaseModel):
     topic: str = Field(examples = ["寫一段關於LLM Agent的介紹"], description="使用者所輸入的Prompt，作為Podcast生成的主題")
-    max_analysts: int = Field(examples = [3], description="使用多少位research agent來蒐集這個主題的參考資料")
+    max_analysts: int = Field(examples = [3], description="使用多少位research agent來蒐集這主題的參考資料")
     host_name: str = Field(examples = ["主持人"], description="主持人名字")
     host_background: str = Field(examples = ["主持人是一位資深記者，擁有豐富的新聞採訪經驗，擅長以輕鬆有趣的方式採訪嘉賓，並將複雜的議題轉化為聽眾容易理解的內容。"], description="主持人背景")
     guest_name: str = Field(examples = ["來賓"], description="來賓名字")
@@ -76,7 +76,7 @@ class PdfInput(BaseModel):
     host_name: str = Field(examples = ["主持人"], description="主持人名字")
     host_background: str = Field(examples = ["主持人是一位資深的領域學者，擁有豐富的研究經驗，擅長以輕鬆有趣的方式採訪嘉賓，並將複雜的議題轉化為聽眾容易理解的內容。"], description="主持人背景")
     guest_name: str = Field(examples = ["來賓"], description="來賓名字")
-    guest_background: str = Field(examples = ["來賓是一位資深的領域學者，擁有豐富的研究經驗，擅長以輕鬆有趣的方式解釋複雜的議題，並將其轉化為聽眾容易理解的內容。"], description="來賓背景")
+    guest_background: str = Field(examples = ["來賓是一位資深的領域學者，擁有豐富的研究經驗，擅長以輕鬆有趣的方式解釋雜的議題，並將其轉化為聽眾容易理解的內容。"], description="來賓背景")
 
 
 class ArxivInput(BaseModel):
@@ -103,6 +103,10 @@ class AudioScript(BaseModel):
 class VoiceSettings(BaseModel):
     host_voice: str = "zh-TW-HsiaoChenNeural"
     guest_voice: str = "zh-TW-YunJheNeural"
+    host_speed: float = 1.0
+    guest_speed: float = 1.0
+    host_pitch: int = 0
+    guest_pitch: int = 0
 
 class PodcastScript(BaseModel):
     dialogue: List[dict]
@@ -115,6 +119,10 @@ class PreviewRequest(BaseModel):
     text: str
     voice: str
     service: str = "azure"  # 預設使用 Azure
+
+class RequestData(BaseModel):
+    script: PodcastScript
+    voice_settings: Optional[VoiceSettings] = None
 
 # 確保參考資料目錄存在
 REFERENCES_PATH.mkdir(parents=True, exist_ok=True)
@@ -170,7 +178,7 @@ def pdf_to_text(pdf_content):
 @app.post("/api/upload/pdf")
 async def upload_pdf(
     pdf_file: UploadFile = File(...),
-    is_temporary: bool = Form(False)  # 新增參數來區分是否為臨時上傳
+    is_temporary: bool = Form(False)  # 新增參來區分是否為臨時上傳
 ):
     """上傳 PDF 並生成摘要，可選擇是否為臨時檔案(若為臨時檔案則不作摘要僅暫存)"""
 
@@ -242,7 +250,7 @@ async def upload_pdf(
                 # 將 PDF 轉換為純文本以利於用於摘要處理
                 text_content = pdf_to_text(io.BytesIO(content))
                 
-                # 使用 summarizing_workflow 生成總結
+                # 使��� summarizing_workflow 生成總結
                 summary_input = {"content": text_content}
                 summary_output = summarizing_graph.invoke(summary_input)
                 
@@ -265,7 +273,7 @@ async def upload_pdf(
                 print(f"生成摘要時發生錯誤：{str(e)}")
                 # 繼續執行，不中斷上傳流程
             
-            print(f"參考資料已儲存至：{folder_path}")
+            print(f"參考資料儲存至：{folder_path}")
             
             return {
                 "status": "success",
@@ -523,106 +531,38 @@ async def get_pdf(folder_name: str):
 
 
 
-@app.post("/api/synthesize", response_model=AudioScript)
-async def synthesize_script(script: PodcastScript, voice_settings: Optional[VoiceSettings] = None):
-    """
-    將 Podcast 腳本轉換為語音檔
-    
-    Args:
-        script: Podcast 腳本
-        voice_settings: 語音設定（可選）
-    
-    Returns:
-        包含音檔路徑的腳本資料
-    """
-    try:
-        # 將 PodcastScript 轉換為可處理的格式
-        script_dict = {
-            "dialogue": [
-                {"speaker": d["speaker"], "content": d["content"]} 
-                for d in script.dialogue
-            ],
-            "host_name": script.host_name,
-            "guest_name": script.guest_name,
-            "host_background": script.host_background,
-            "guest_background": script.guest_background
-        }
-        
-        # 使用預設或自訂的語音設定
-        voice_params = {}
-        if voice_settings:
-            voice_params = {
-                "host_voice": voice_settings.host_voice,
-                "guest_voice": voice_settings.guest_voice
-            }
-        
-        # 生成語音
-        result = synthesize_podcast(script_dict, **voice_params)
-        
-        # 檢查是否成功生成音檔
-        if not os.path.exists(result["full_audio"]):
-            raise HTTPException(
-                status_code=500,
-                detail="語音合成失敗：無法生成音檔"
-            )
-        
-        # 將結果轉換為 AudioScript 格式
-        return AudioScript(**result)
-        
-    except Exception as e:
-        raise HTTPException(
-            status_code=500,
-            detail=f"語音合成失敗：{str(e)}"
-        )
-
-
-
-@app.get("/api/voices")
-async def get_available_voices():
-    """取得可用的語音選項"""
-    return {
-        "host_voices": [
-            {
-                "id": "zh-TW-HsiaoChenNeural",
-                "name": "小陳",
-                "gender": "女聲"
-            },
-            {
-                "id": "zh-TW-HsiaoYuNeural",
-                "name": "小玉",
-                "gender": "女聲"
-            }
-        ],
-        "guest_voices": [
-            {
-                "id": "zh-TW-YunJheNeural",
-                "name": "雲哲",
-                "gender": "男聲"
-            }
-        ]
-    }
-
 @app.post("/api/synthesize/stream")
-async def synthesize_script_stream(
-    script: PodcastScript,
-    voice_settings: Optional[VoiceSettings] = None
-):
+async def synthesize_script_stream(request_data: RequestData):
     """串流式生成 Podcast 語音"""
     try:
+        # 使用預設或自訂的語音設定
+        voice_settings = request_data.voice_settings
+        print(f"收到的語音設定: {voice_settings}")
+        
+        if not voice_settings:
+            print("使用預設語音設定")
+            voice_settings = VoiceSettings()
+        
+        # 建立語音合成器並設定語音
         synthesizer = PodcastSynthesizer(
-            host_voice=voice_settings.host_voice if voice_settings else "zh-TW-HsiaoChenNeural",
-            guest_voice=voice_settings.guest_voice if voice_settings else "zh-TW-YunJheNeural"
+            host_voice=voice_settings.host_voice,
+            guest_voice=voice_settings.guest_voice
         )
+        
+        print(f"使用語音設定 - 主持人: {voice_settings.host_voice}, 來賓: {voice_settings.guest_voice}")
 
         async def generate():
-            async for result in synthesizer.process_segments(script.dict()):
+            async for result in synthesizer.process_segments(request_data.script.dict()):
                 yield json.dumps(result, ensure_ascii=False).encode('utf-8') + b'\n'
 
         return StreamingResponse(
             generate(),
             media_type='application/x-ndjson'
         )
+    except HTTPException:
+        raise
     except Exception as e:
+        print(f"語音合成錯誤：{str(e)}")
         raise HTTPException(
             status_code=500,
             detail=str(e)
@@ -632,45 +572,71 @@ async def synthesize_script_stream(
 async def preview_voice(request: PreviewRequest):
     try:
         if request.service == "azure":
+            # 檢查環境變數
+            speech_key = os.getenv("SPEECH_KEY")  # 改用與其他地方相同的環境變數名稱
+            speech_region = os.getenv("SPEECH_REGION")
+            
+            if not speech_key or not speech_region:
+                raise HTTPException(
+                    status_code=500,
+                    detail="未設定 Azure 語音服務的認證資訊"
+                )
+            
+            print(f"使用 Azure 設定 - Region: {speech_region}")
+            
             # 設定 Azure 語音服務
             speech_config = speechsdk.SpeechConfig(
-                subscription=os.getenv("AZURE_SPEECH_KEY"),
-                region=os.getenv("AZURE_SPEECH_REGION")
-            )
-            
-            # 設定語音輸出為記憶體串流
-            memory_stream = io.BytesIO()
-            audio_config = speechsdk.audio.AudioOutputConfig(
-                filename=None,
-                stream=memory_stream
+                subscription=speech_key,
+                region=speech_region
             )
             
             # 設定語音合成器
             speech_config.speech_synthesis_voice_name = request.voice
             synthesizer = speechsdk.SpeechSynthesizer(
                 speech_config=speech_config,
-                audio_config=audio_config
+                audio_config=None
             )
             
+            # 使用 SSML 合成語音
+            ssml = f"""
+            <speak version="1.0" xmlns="http://www.w3.org/2001/10/synthesis" xml:lang="zh-TW">
+                <voice name="{request.voice}">
+                    {request.text}
+                </voice>
+            </speak>
+            """
+            
+            print(f"開始合成語音預覽 - Voice: {request.voice}")
+            
             # 合成語音
-            result = synthesizer.speak_text_async(request.text).get()
+            result = synthesizer.speak_ssml_async(ssml).get()
             
             if result.reason == speechsdk.ResultReason.SynthesizingAudioCompleted:
-                # 重置串流位置
-                memory_stream.seek(0)
+                # 將音頻數據轉換為 BytesIO 對象
+                audio_stream = io.BytesIO(result.audio_data)
+                audio_stream.seek(0)
+                
+                print("語音預覽合成成功")
                 
                 # 返回音頻串流
                 return StreamingResponse(
-                    memory_stream,
+                    audio_stream,
                     media_type="audio/wav",
                     headers={
                         "Content-Disposition": "attachment; filename=preview.wav"
                     }
                 )
             else:
+                error_msg = f"語音合成失敗: {result.reason}"
+                if result.reason == speechsdk.ResultReason.Canceled:
+                    cancellation_details = result.cancellation_details
+                    error_msg += f"\n取消原因: {cancellation_details.reason}"
+                    error_msg += f"\n錯誤詳情: {cancellation_details.error_details}"
+                
+                print(f"語音合成失敗: {error_msg}")
                 raise HTTPException(
                     status_code=500,
-                    detail=f"語音合成失敗: {result.reason}"
+                    detail=error_msg
                 )
         else:
             raise HTTPException(
@@ -679,9 +645,13 @@ async def preview_voice(request: PreviewRequest):
             )
             
     except Exception as e:
+        error_msg = f"語音預覽失敗: {str(e)}"
+        print(error_msg)
+        import traceback
+        print(f"詳細錯誤:\n{traceback.format_exc()}")
         raise HTTPException(
             status_code=500,
-            detail=f"語音預覽失敗: {str(e)}"
+            detail=error_msg
         )
 
 if __name__ == "__main__":

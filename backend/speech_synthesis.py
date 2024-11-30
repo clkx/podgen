@@ -17,30 +17,33 @@ BACKEND_DIR = os.path.dirname(os.path.abspath(__file__))
 DEFAULT_AUDIO_DIR = os.path.join(BACKEND_DIR, "stores", "audio")
 
 class VoiceProfile:
-    def __init__(self, role: str, voice_name: str):
+    def __init__(self, role: str, voice_name: str, speed: float = 1.0, pitch: int = 0):
         self.role = role
         self.voice_name = voice_name
+        self.speed = speed
+        self.pitch = pitch
 
 class VoiceConfig:
-    def __init__(self, host_voice: str = "zh-TW-HsiaoChenNeural", guest_voice: str = "zh-TW-YunJheNeural"):
+    def __init__(self, host_voice: str = "zh-TW-HsiaoChenNeural", 
+                 guest_voice: str = "zh-TW-YunJheNeural",
+                 host_speed: float = 1.0,
+                 guest_speed: float = 1.0,
+                 host_pitch: int = 0,
+                 guest_pitch: int = 0):
         """
         初始化語音設定
         
         Args:
             host_voice: 主持人的語音，預設為女聲 HsiaoChen
             guest_voice: 來賓的語音，預設為男聲 YunJhe
-            
-        可用的語音選項：
-            女聲：
-            - zh-TW-HsiaoChenNeural (小陳)
-            - zh-TW-HsiaoYuNeural (小玉)
-            
-            男聲：
-            - zh-TW-YunJheNeural (雲哲)
+            host_speed: 主持人語速 (0.5-2.0)
+            guest_speed: 來賓語速 (0.5-2.0)
+            host_pitch: 主持人音調 (-10 到 10)
+            guest_pitch: 來賓音調 (-10 到 10)
         """
         self.profiles = {
-            "主持人": VoiceProfile("主持人", host_voice),
-            "來賓": VoiceProfile("來賓", guest_voice),
+            "主持人": VoiceProfile("主持人", host_voice, host_speed, host_pitch),
+            "來賓": VoiceProfile("來賓", guest_voice, guest_speed, guest_pitch),
         }
 
 class PodcastSynthesizer:
@@ -70,12 +73,14 @@ class PodcastSynthesizer:
         os.makedirs(self.temp_dir, exist_ok=True)
         os.makedirs(self.segments_dir, exist_ok=True)
 
-    def synthesize_segment(self, text: str, voice_name: str, output_file: str) -> bool:
+    def synthesize_segment(self, text: str, voice_name: str, output_file: str, speed: float = 1.0, pitch: int = 0) -> bool:
         """合成單一段落的語音"""
         try:
             print(f"\n正在合成語音段落:")
             print(f"- 使用語音: {voice_name}")
-            print(f"- 文本內容: {text[:50]}...")  # 只顯示前50個字
+            print(f"- 語速: {speed}")
+            print(f"- 音調: {pitch}")
+            print(f"- 文本內容: {text[:50]}...")
             print(f"- 輸出檔案: {output_file}")
 
             synthesizer = speechsdk.SpeechSynthesizer(
@@ -86,7 +91,9 @@ class PodcastSynthesizer:
             ssml = f"""
             <speak version="1.0" xmlns="http://www.w3.org/2001/10/synthesis" xml:lang="zh-TW">
                 <voice name="{voice_name}">
-                    {text}
+                    <prosody rate="{speed}" pitch="{pitch}st">
+                        {text}
+                    </prosody>
                 </voice>
             </speak>
             """
@@ -154,14 +161,16 @@ class PodcastSynthesizer:
                 temp_file = os.path.join(self.temp_dir, f"segment_{i}.wav")
                 temp_files.append(temp_file)
                 
-                # 生成最終段落檔案路徑，改用簡單的編號格式
+                # 生成最終段落檔路徑，改用簡單的編號格式
                 segment_filename = f"segment_{i:03d}.wav"
                 segment_file = os.path.join(session_dir, segment_filename)
                 
                 success = self.synthesize_segment(
                     content,
                     voice_profile.voice_name,
-                    temp_file
+                    temp_file,
+                    voice_profile.speed,
+                    voice_profile.pitch
                 )
                 
                 if not success:
@@ -260,15 +269,12 @@ class PodcastSynthesizer:
         """串流生成 Podcast，一次生成一個段落並立即回傳"""
         try:
             timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
-            # 建立段落目錄
             segments_dir = os.path.join(self.segments_dir, timestamp)
             os.makedirs(segments_dir, exist_ok=True)
 
-            # 取得主持人和來賓的名稱
             host_name = script_data.get("host_name", "主持人")
             guest_name = script_data.get("guest_name", "來賓")
 
-            # 回報開始處理
             yield {
                 "type": "start",
                 "total_segments": len(script_data["dialogue"]),
@@ -280,10 +286,10 @@ class PodcastSynthesizer:
                     speaker = segment["speaker"]
                     content = segment["content"]
                     
-                    # 選擇語音配置
+                    # 選擇語音配置 - 第一個說話者永遠使用主持人的語音
                     voice_profile = (
                         self.voice_config.profiles["主持人"] 
-                        if speaker == host_name 
+                        if i == 0 or speaker == host_name 
                         else self.voice_config.profiles["來賓"]
                     )
 
@@ -303,7 +309,9 @@ class PodcastSynthesizer:
                     success = self.synthesize_segment(
                         content,
                         voice_profile.voice_name,
-                        segment_file
+                        segment_file,
+                        voice_profile.speed,
+                        voice_profile.pitch
                     )
 
                     if success:
@@ -386,56 +394,73 @@ class PodcastSynthesizer:
         host_name = script_data.get("host_name", "主持人")
         guest_name = script_data.get("guest_name", "來賓")
 
+        print(f"開始處理對話段落")
+        print(f"使用語音設定 - 主持人: {self.voice_config.profiles['主持人'].voice_name}")
+        print(f"使用語音設定 - 來賓: {self.voice_config.profiles['來賓'].voice_name}")
+
         for i, segment in enumerate(script_data["dialogue"]):
-            speaker = segment["speaker"]
-            content = segment["content"]
-            
-            voice_profile = (
-                self.voice_config.profiles["主持人"] 
-                if speaker == host_name 
-                else self.voice_config.profiles["來賓"]
-            )
-
-            # 生成檔案路徑
-            segment_filename = f"segment_{i:03d}.wav"
-            segment_file = os.path.join(session_dir, segment_filename)
-            
-            # 開始處理前先回報
-            yield {
-                "type": "progress",
-                "status": "processing",
-                "index": i,
-                "total": len(script_data["dialogue"]),
-                "speaker": speaker,
-                "content": content
-            }
-
-            # 非阻塞地生成語音
-            success = await self.generate_segment(
-                content,
-                voice_profile.voice_name,
-                segment_file
-            )
-
-            if success:
-                # 生成相對 URL 路徑，而不是使用本地檔案路徑
-                relative_url = f"/audio/segments/{timestamp}/segment_{i:03d}.wav"
+            try:
+                speaker = segment["speaker"]
+                content = segment["content"]
                 
+                # 根據說話者選擇語音
+                voice_profile = (
+                    self.voice_config.profiles["主持人"] 
+                    if speaker == host_name 
+                    else self.voice_config.profiles["來賓"]
+                )
+                
+                print(f"\n處理第 {i+1} 段對話:")
+                print(f"- 說話者: {speaker}")
+                print(f"- 使用語音: {voice_profile.voice_name}")
+
+                # 生成檔案路徑
+                segment_filename = f"segment_{i:03d}.wav"
+                segment_file = os.path.join(session_dir, segment_filename)
+                
+                # 開始處理前先回報
                 yield {
-                    "type": "audio",
-                    "status": "success",
+                    "type": "progress",
+                    "status": "processing",
                     "index": i,
                     "total": len(script_data["dialogue"]),
                     "speaker": speaker,
                     "content": content,
-                    "audio_file": relative_url  # 使用相對 URL 路徑
+                    "voice": voice_profile.voice_name
                 }
-            else:
+
+                # 生成語音
+                success = await self.generate_segment(
+                    content,
+                    voice_profile.voice_name,
+                    segment_file
+                )
+
+                if success:
+                    relative_url = f"/audio/segments/{timestamp}/segment_{i:03d}.wav"
+                    yield {
+                        "type": "audio",
+                        "status": "success",
+                        "index": i,
+                        "total": len(script_data["dialogue"]),
+                        "speaker": speaker,
+                        "content": content,
+                        "audio_file": relative_url,
+                        "voice": voice_profile.voice_name
+                    }
+                else:
+                    yield {
+                        "type": "error",
+                        "status": "error",
+                        "index": i,
+                        "message": f"第 {i+1} 段語音生成失敗"
+                    }
+            except Exception as e:
+                print(f"處理段落 {i+1} 時發生錯誤: {str(e)}")
                 yield {
                     "type": "error",
-                    "status": "error",
                     "index": i,
-                    "message": f"第 {i+1} 段語音生成失敗"
+                    "message": str(e)
                 }
 
 def synthesize_podcast(

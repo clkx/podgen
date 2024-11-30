@@ -147,8 +147,8 @@ const azureVoices = ref([
 ])
 
 // 主持人和來賓的語音設定
-const hostVoice = ref(characterStore.host.voice)
-const guestVoice = ref(characterStore.guest.voice)
+const hostVoice = ref(characterStore.host.voice.name)
+const guestVoice = ref(characterStore.guest.voice.name)
 
 // 試聽語音
 const previewVoice = async (role) => {
@@ -184,24 +184,41 @@ const previewVoice = async (role) => {
 
 // 儲存設定
 const saveSettings = () => {
-  characterStore.updateSettings({
+  console.log('=== 儲存語音設定 ===')
+  console.log('主持人語音設定:', hostVoice.value)
+  console.log('來賓語音設定:', guestVoice.value)
+  
+  characterStore.updateVoiceSettings({
     host: {
-      ...characterStore.host,
-      voice: hostVoice.value
+      name: hostVoice.value
     },
     guest: {
-      ...characterStore.guest,
-      voice: guestVoice.value
+      name: guestVoice.value
     }
   })
-  // 這裡可以加入儲存成功的提示
+
+  console.log('更新後的 characterStore:', {
+    host: characterStore.host,
+    guest: characterStore.guest
+  })
 }
 
 // 載入設定
 onMounted(() => {
+  console.log('=== 載入語音設定 ===')
   characterStore.loadSettings()
-  hostVoice.value = characterStore.host.voice
-  guestVoice.value = characterStore.guest.voice
+  console.log('載入前的語音設定:', {
+    hostVoice: hostVoice.value,
+    guestVoice: guestVoice.value
+  })
+  
+  hostVoice.value = characterStore.host.voice.name
+  guestVoice.value = characterStore.guest.voice.name
+  
+  console.log('載入後的語音設定:', {
+    hostVoice: hostVoice.value,
+    guestVoice: guestVoice.value
+  })
 })
 </script>
 
