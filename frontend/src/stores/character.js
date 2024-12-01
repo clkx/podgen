@@ -19,6 +19,17 @@ export const useCharacterStore = defineStore('character', {
         speed: 1.0,
         pitch: 0
       }
+    },
+    voiceSettings: {
+      azure: {
+        host: null,
+        guest: null
+      },
+      fish: {
+        host: null,
+        guest: null
+      },
+      activeService: 'azure'
     }
   }),
 
@@ -51,20 +62,63 @@ export const useCharacterStore = defineStore('character', {
 
     // 更新語音設定
     updateVoiceSettings(settings) {
-      if (settings.host) {
-        this.host.voice = {
-          ...this.host.voice,
-          ...settings.host
+      this.voiceSettings = {
+        ...this.voiceSettings,
+        ...settings
+      }
+
+      // 根據當前選擇的服務更新角色的語音設定
+      const service = settings.activeService
+      if (service === 'azure') {
+        if (settings.azure.host) {
+          this.host.voice = {
+            name: settings.azure.host.name,
+            speed: 1.0,
+            pitch: 0
+          }
+        }
+        if (settings.azure.guest) {
+          this.guest.voice = {
+            name: settings.azure.guest.name,
+            speed: 1.0,
+            pitch: 0
+          }
+        }
+      } else if (service === 'fish') {
+        if (settings.fish.host) {
+          this.host.voice = {
+            name: settings.fish.host.id,
+            speed: 1.0,
+            pitch: 0,
+            service: 'fish'
+          }
+        }
+        if (settings.fish.guest) {
+          this.guest.voice = {
+            name: settings.fish.guest.id,
+            speed: 1.0,
+            pitch: 0,
+            service: 'fish'
+          }
         }
       }
-      if (settings.guest) {
-        this.guest.voice = {
-          ...this.guest.voice,
-          ...settings.guest
-        }
-      }
+
       // 儲存到 localStorage
       this.saveToLocalStorage()
+    },
+
+    // 載入語音設定
+    loadVoiceSettings() {
+      const settings = localStorage.getItem('podgen_voice_settings')
+      if (settings) {
+        const parsed = JSON.parse(settings)
+        this.voiceSettings = {
+          ...this.voiceSettings,
+          ...parsed
+        }
+        return parsed
+      }
+      return this.voiceSettings
     },
 
     // 儲存到 localStorage
@@ -73,35 +127,7 @@ export const useCharacterStore = defineStore('character', {
         host: this.host,
         guest: this.guest
       }))
-    },
-
-    // 從 localStorage 載入設定
-    loadSettings() {
-      const settings = localStorage.getItem('podgen_character_settings')
-      if (settings) {
-        const parsed = JSON.parse(settings)
-        // 合併預設值和儲存的設定
-        if (parsed.host) {
-          this.host = {
-            ...this.host,
-            ...parsed.host,
-            voice: {
-              ...this.host.voice,
-              ...parsed.host.voice
-            }
-          }
-        }
-        if (parsed.guest) {
-          this.guest = {
-            ...this.guest,
-            ...parsed.guest,
-            voice: {
-              ...this.guest.voice,
-              ...parsed.guest.voice
-            }
-          }
-        }
-      }
+      localStorage.setItem('podgen_voice_settings', JSON.stringify(this.voiceSettings))
     }
   }
 }) 

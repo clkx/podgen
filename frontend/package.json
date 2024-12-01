@@ -10,14 +10,18 @@
   },
   "dependencies": {
     "@tailwindcss/forms": "^0.5.9",
+    "@virtual-list/vue": "^1.2.0",
     "@vitejs/plugin-vue": "^5.2.0",
     "axios": "^1.7.7",
     "howler": "^2.2.4",
+    "lodash-es": "^4.17.21",
     "pdfjs-dist": "^4.8.69",
     "pinia": "^2.2.6",
     "vite": "^5.4.11",
     "vue": "^3.5.13",
-    "vue-router": "^4.4.5"
+    "vue-router": "^4.4.5",
+    "vue-virtual-scroll-grid": "^1.11.0",
+    "vue3-virtual-scroller": "^0.2.3"
   },
   "devDependencies": {
     "autoprefixer": "^10.4.20",

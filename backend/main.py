@@ -26,6 +26,7 @@ from backend.schema import *
 from backend.speech_synthesis import synthesize_podcast, PodcastSynthesizer
 from backend.database.qdrant_manager import QdrantManager
 from backend.models.embedding import EMBEDDING_MODEL
+from backend.fish_audio import router as fish_audio_router
 
 load_dotenv()
 
@@ -250,7 +251,7 @@ async def upload_pdf(
                 # 將 PDF 轉換為純文本以利於用於摘要處理
                 text_content = pdf_to_text(io.BytesIO(content))
                 
-                # 使��� summarizing_workflow 生成總結
+                # 使 summarizing_workflow 生成總結
                 summary_input = {"content": text_content}
                 summary_output = summarizing_graph.invoke(summary_input)
                 
@@ -533,7 +534,7 @@ async def get_pdf(folder_name: str):
 
 @app.post("/api/synthesize/stream")
 async def synthesize_script_stream(request_data: RequestData):
-    """串流式生成 Podcast 語音"""
+    """串流式生成 azure 語音"""
     try:
         # 使用預設或自訂的語音設定
         voice_settings = request_data.voice_settings
@@ -570,6 +571,7 @@ async def synthesize_script_stream(request_data: RequestData):
 
 @app.post("/api/synthesize/preview")
 async def preview_voice(request: PreviewRequest):
+    """預覽 azure 語音"""
     try:
         if request.service == "azure":
             # 檢查環境變數
@@ -653,6 +655,8 @@ async def preview_voice(request: PreviewRequest):
             status_code=500,
             detail=error_msg
         )
+
+app.include_router(fish_audio_router)
 
 if __name__ == "__main__":
     import uvicorn

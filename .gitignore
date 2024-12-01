@@ -3,3 +3,4 @@ frontend_deprecated/
 frontend_deprecated/*
 tests/
 tests/*
+test.py
